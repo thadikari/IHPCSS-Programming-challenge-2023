@@ -10,7 +10,6 @@
 #include <math.h>
 #include <omp.h>
 #include <mpi.h>
-#include <string.h>
 
 
 /// The number of vertices in the graph.
@@ -27,9 +26,12 @@
  * Redundant edges are still represented with value 1.0.
  */
 double adjacency_matrix[GRAPH_ORDER][GRAPH_ORDER];
+double outdegree[GRAPH_ORDER];
 double max_diff = 0.0;
 double min_diff = 1.0;
 double total_diff = 0.0;
+double damping_value = (1.0 - DAMPING_FACTOR) / GRAPH_ORDER;
+
 
 void initialize_graph(void)
 {
@@ -41,6 +43,35 @@ void initialize_graph(void)
         }
     }
 }
+
+
+void call_init_double_loop()
+{
+    for(int j = 0; j < GRAPH_ORDER; j++)
+    {
+        outdegree[j] = 0.;
+        for(int k = 0; k < GRAPH_ORDER; k++)
+        {
+            outdegree[j] += adjacency_matrix[j][k];
+        }
+    }
+}
+
+
+void call_double_loop(double pagerank[], double new_pagerank[])
+{
+    for(int i = 0; i < GRAPH_ORDER; i++)
+    {
+        new_pagerank[i] = 0.;
+        for(int j = 0; j < GRAPH_ORDER; j++)
+        {
+            // TO DO: Try with epsilon, outdegree[j] + epsil
+            new_pagerank[i] += adjacency_matrix[j][i] * pagerank[j] / fmax(1., outdegree[j]);
+        }
+        new_pagerank[i] = DAMPING_FACTOR * new_pagerank[i] + damping_value;
+    }
+}
+
 
 /**
  * @brief Calculates the pagerank of all vertices in the graph.
@@ -56,7 +87,6 @@ void calculate_pagerank(double pagerank[])
         pagerank[i] = initial_rank;
     }
 
-    double damping_value = (1.0 - DAMPING_FACTOR) / GRAPH_ORDER;
     double diff = 1.0;
     size_t iteration = 0;
     double start = omp_get_wtime();
@@ -71,38 +101,18 @@ void calculate_pagerank(double pagerank[])
     // If we exceeded the MAX_TIME seconds, we stop. If we typically spend X seconds on an iteration, and we are less than X seconds away from MAX_TIME, we stop.
 
     // TO DO: Test gpu vs cpu parallelization
-    double outdegree[GRAPH_ORDER];
-    for(int j = 0; j < GRAPH_ORDER; j++)
-    {
-        outdegree[j] = 0.;
-        for(int k = 0; k < GRAPH_ORDER; k++)
-        {
-            outdegree[j] += adjacency_matrix[j][k];
-        }
-    }
+    call_init_double_loop();
 
     while(elapsed < MAX_TIME && (elapsed + time_per_iteration) < MAX_TIME)
     {
         double iteration_start = omp_get_wtime();
-
-        memset(new_pagerank, 0., sizeof(new_pagerank));
-
         diff = 0.0;
         double pagerank_total = 0.0;
 
+        call_double_loop(pagerank, new_pagerank);
         for(int i = 0; i < GRAPH_ORDER; i++)
         {
-			for(int j = 0; j < GRAPH_ORDER; j++)
-            {
-                // TO DO: Try with epsilon, outdegree[j] + epsil
-                new_pagerank[i] += adjacency_matrix[j][i] * pagerank[j] / fmax(1., outdegree[j]);
-			}
-            new_pagerank[i] = DAMPING_FACTOR * new_pagerank[i] + damping_value;
             diff += fabs(new_pagerank[i] - pagerank[i]);
-		}
-
-        for(int i = 0; i < GRAPH_ORDER; i++)
-        {
             pagerank[i] = new_pagerank[i];
             pagerank_total += pagerank[i];
         }
