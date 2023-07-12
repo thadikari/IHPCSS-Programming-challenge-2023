@@ -3,6 +3,12 @@ import argparse
 import os
 
 
+'''
+Use the following command to scan files and print iterations.
+for name in *.txt; do sed '4q;d' $name; echo "       $name"; done
+'''
+
+
 def main():
     for OMP_NUM_THREADS in _a.OMP_NUM_THREADS:
         for MPI_PROCESS_COUNT in _a.MPI_PROCESS_COUNT:
@@ -23,8 +29,10 @@ def run(OMP_NUM_THREADS, MPI_PROCESS_COUNT, NUM_GPU):
 
     if OMP_NUM_THREADS:
         new = f'export OMP_NUM_THREADS={OMP_NUM_THREADS};'
-        cc = cc.replace('export OMP_NUM_THREADS=$SLURM_CPUS_PER_TASK;', new)
+        cc = cc.replace('export OMP_NUM_THREADS=$SLURM_CPUS_PER_TASK', new)
         cc = cc.replace('export OMP_NUM_THREADS=1;', new)
+        new = f'#SBATCH --cpus-per-task={OMP_NUM_THREADS}'
+        cc = cc.replace('#SBATCH --cpus-per-task=2', new)
 
     if OMP_NUM_THREADS:
         cc = cc.replace('export MPI_PROCESS_COUNT=1;', f'export MPI_PROCESS_COUNT={MPI_PROCESS_COUNT};')
@@ -43,7 +51,7 @@ def run(OMP_NUM_THREADS, MPI_PROCESS_COUNT, NUM_GPU):
 
 def make_parser():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--NUM_GPU', type=int, nargs='+', default=[1])
+    parser.add_argument('--NUM_GPU', type=int, nargs='+', default=[None])
     parser.add_argument('--OMP_NUM_THREADS', type=int, nargs='+', default=[None])
     parser.add_argument('--MPI_PROCESS_COUNT', type=int, nargs='+', default=[None])
     parser.add_argument('--cpu', action='store_true')
