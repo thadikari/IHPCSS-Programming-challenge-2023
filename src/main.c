@@ -25,8 +25,8 @@
  * will be 1.0. The absence of edge is represented with value 0.0.
  * Redundant edges are still represented with value 1.0.
  */
-double adjacency_matrix[GRAPH_ORDER][GRAPH_ORDER];
-double outdegree[GRAPH_ORDER];
+int8_t adjacency_matrix[GRAPH_ORDER][GRAPH_ORDER];
+double inverse_outdegree[GRAPH_ORDER];
 double max_diff = 0.0;
 double min_diff = 1.0;
 double total_diff = 0.0;
@@ -49,26 +49,12 @@ void call_init_double_loop()
 {
     for(int j = 0; j < GRAPH_ORDER; j++)
     {
-        outdegree[j] = 0.;
+        int outdegree = 0.;
         for(int k = 0; k < GRAPH_ORDER; k++)
         {
-            outdegree[j] += adjacency_matrix[j][k];
+            outdegree += adjacency_matrix[j][k];
         }
-    }
-}
-
-
-void call_double_loop(double pagerank[], double new_pagerank[])
-{
-    for(int i = 0; i < GRAPH_ORDER; i++)
-    {
-        new_pagerank[i] = 0.;
-        for(int j = 0; j < GRAPH_ORDER; j++)
-        {
-            // TO DO: Try with epsilon, outdegree[j] + epsil
-            new_pagerank[i] += adjacency_matrix[j][i] * pagerank[j] / fmax(1., outdegree[j]);
-        }
-        new_pagerank[i] = DAMPING_FACTOR * new_pagerank[i] + damping_value;
+        inverse_outdegree[j] = outdegree == 0.? 0. : 1./outdegree;
     }
 }
 
@@ -87,12 +73,12 @@ void calculate_pagerank(double pagerank[])
         pagerank[i] = initial_rank;
     }
 
-    double diff = 1.0;
     size_t iteration = 0;
     double start = omp_get_wtime();
     double elapsed = omp_get_wtime() - start;
     double time_per_iteration = 0;
     double new_pagerank[GRAPH_ORDER];
+
     for(int i = 0; i < GRAPH_ORDER; i++)
     {
         new_pagerank[i] = 0.0;
@@ -100,16 +86,24 @@ void calculate_pagerank(double pagerank[])
 
     // If we exceeded the MAX_TIME seconds, we stop. If we typically spend X seconds on an iteration, and we are less than X seconds away from MAX_TIME, we stop.
 
-    // TO DO: Test gpu vs cpu parallelization
     call_init_double_loop();
 
     while(elapsed < MAX_TIME && (elapsed + time_per_iteration) < MAX_TIME)
     {
         double iteration_start = omp_get_wtime();
-        diff = 0.0;
+        double diff = 0.0;
         double pagerank_total = 0.0;
 
-        call_double_loop(pagerank, new_pagerank);
+        for(int i = 0; i < GRAPH_ORDER; i++)
+        {
+            double total = 0.;
+            for(int j = 0; j < GRAPH_ORDER; j++)
+            {
+                total += adjacency_matrix[j][i] * pagerank[j] * inverse_outdegree[j];
+            }
+            new_pagerank[i] = DAMPING_FACTOR * total + damping_value;
+        }
+
         for(int i = 0; i < GRAPH_ORDER; i++)
         {
             diff += fabs(new_pagerank[i] - pagerank[i]);
@@ -151,7 +145,7 @@ void generate_nice_graph(void)
             int destination = j;
             if(i != j)
             {
-                adjacency_matrix[source][destination] = 1.0;
+                adjacency_matrix[source][destination] = 1;
             }
         }
     }
@@ -174,7 +168,7 @@ void generate_sneaky_graph(void)
             int destination = j;
             if(i != j)
             {
-                adjacency_matrix[source][destination] = 1.0;
+                adjacency_matrix[source][destination] = 1;
             }
         }
     }

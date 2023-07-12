@@ -25,7 +25,7 @@ def run(OMP_NUM_THREADS, MPI_PROCESS_COUNT, NUM_GPU):
 
     runs_dir = os.path.expanduser('~') + '/runs'
     Path(f'{runs_dir}/outputs').mkdir(parents=True, exist_ok=True)
-    prefix = f'{OMP_NUM_THREADS}_{MPI_PROCESS_COUNT}_{NUM_GPU}'
+    prefix = f'{OMP_NUM_THREADS}_{MPI_PROCESS_COUNT}_{NUM_GPU}_{dev}'
 
     if OMP_NUM_THREADS:
         new = f'export OMP_NUM_THREADS={OMP_NUM_THREADS};'
