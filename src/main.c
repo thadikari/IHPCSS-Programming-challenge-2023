@@ -10,6 +10,8 @@
 #include <math.h>
 #include <omp.h>
 #include <mpi.h>
+#include <string.h>
+
 
 /// The number of vertices in the graph.
 #define GRAPH_ORDER 1000
@@ -67,59 +69,48 @@ void calculate_pagerank(double pagerank[])
     }
 
     // If we exceeded the MAX_TIME seconds, we stop. If we typically spend X seconds on an iteration, and we are less than X seconds away from MAX_TIME, we stop.
+
+    // TO DO: Test gpu vs cpu parallelization
+    double outdegree[GRAPH_ORDER];
+    for(int j = 0; j < GRAPH_ORDER; j++)
+    {
+        outdegree[j] = 0.;
+        for(int k = 0; k < GRAPH_ORDER; k++)
+        {
+            outdegree[j] += adjacency_matrix[j][k];
+        }
+    }
+
     while(elapsed < MAX_TIME && (elapsed + time_per_iteration) < MAX_TIME)
     {
         double iteration_start = omp_get_wtime();
 
-        for(int i = 0; i < GRAPH_ORDER; i++)
-        {
-            new_pagerank[i] = 0.0;
-        }
+        memset(new_pagerank, 0., sizeof(new_pagerank));
 
-		for(int i = 0; i < GRAPH_ORDER; i++)
+        diff = 0.0;
+        double pagerank_total = 0.0;
+
+        for(int i = 0; i < GRAPH_ORDER; i++)
         {
 			for(int j = 0; j < GRAPH_ORDER; j++)
             {
-				if (adjacency_matrix[j][i] == 1.0)
-                {
-					int outdegree = 0;
-
-					for(int k = 0; k < GRAPH_ORDER; k++)
-                    {
-						if (adjacency_matrix[j][k] == 1.0)
-                        {
-							outdegree++;
-						}
-					}
-					new_pagerank[i] += pagerank[j] / (double)outdegree;
-				}
+                // TO DO: Try with epsilon, outdegree[j] + epsil
+                new_pagerank[i] += adjacency_matrix[j][i] * pagerank[j] / fmax(1., outdegree[j]);
 			}
+            new_pagerank[i] = DAMPING_FACTOR * new_pagerank[i] + damping_value;
+            diff += fabs(new_pagerank[i] - pagerank[i]);
 		}
 
         for(int i = 0; i < GRAPH_ORDER; i++)
         {
-            new_pagerank[i] = DAMPING_FACTOR * new_pagerank[i] + damping_value;
+            pagerank[i] = new_pagerank[i];
+            pagerank_total += pagerank[i];
         }
 
-        diff = 0.0;
-        for(int i = 0; i < GRAPH_ORDER; i++)
-        {
-            diff += fabs(new_pagerank[i] - pagerank[i]);
-        }
         max_diff = (max_diff < diff) ? diff : max_diff;
         total_diff += diff;
         min_diff = (min_diff > diff) ? diff : min_diff;
 
-        for(int i = 0; i < GRAPH_ORDER; i++)
-        {
-            pagerank[i] = new_pagerank[i];
-        }
-
-        double pagerank_total = 0.0;
-        for(int i = 0; i < GRAPH_ORDER; i++)
-        {
-            pagerank_total += pagerank[i];
-        }
         if(fabs(pagerank_total - 1.0) >= 1.0)
         {
             printf("[ERROR] Iteration %zu: sum of all pageranks is not 1 but %.12f.\n", iteration, pagerank_total);
