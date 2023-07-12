@@ -4,7 +4,7 @@
  * Your challenge is to optimise it using OpenMP and/or MPI.
  * @author Ludovic Capelli (l.capelli@epcc.ed.ac.uk)
  **/
- 
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
@@ -28,7 +28,7 @@ double adjacency_matrix[GRAPH_ORDER][GRAPH_ORDER];
 double max_diff = 0.0;
 double min_diff = 1.0;
 double total_diff = 0.0;
- 
+
 void initialize_graph(void)
 {
     for(int i = 0; i < GRAPH_ORDER; i++)
@@ -47,13 +47,13 @@ void initialize_graph(void)
 void calculate_pagerank(double pagerank[])
 {
     double initial_rank = 1.0 / GRAPH_ORDER;
- 
+
     // Initialise all vertices to 1/n.
     for(int i = 0; i < GRAPH_ORDER; i++)
     {
         pagerank[i] = initial_rank;
     }
- 
+
     double damping_value = (1.0 - DAMPING_FACTOR) / GRAPH_ORDER;
     double diff = 1.0;
     size_t iteration = 0;
@@ -70,12 +70,12 @@ void calculate_pagerank(double pagerank[])
     while(elapsed < MAX_TIME && (elapsed + time_per_iteration) < MAX_TIME)
     {
         double iteration_start = omp_get_wtime();
- 
+
         for(int i = 0; i < GRAPH_ORDER; i++)
         {
             new_pagerank[i] = 0.0;
         }
- 
+
 		for(int i = 0; i < GRAPH_ORDER; i++)
         {
 			for(int j = 0; j < GRAPH_ORDER; j++)
@@ -83,7 +83,7 @@ void calculate_pagerank(double pagerank[])
 				if (adjacency_matrix[j][i] == 1.0)
                 {
 					int outdegree = 0;
-				 
+
 					for(int k = 0; k < GRAPH_ORDER; k++)
                     {
 						if (adjacency_matrix[j][k] == 1.0)
@@ -95,12 +95,12 @@ void calculate_pagerank(double pagerank[])
 				}
 			}
 		}
- 
+
         for(int i = 0; i < GRAPH_ORDER; i++)
         {
             new_pagerank[i] = DAMPING_FACTOR * new_pagerank[i] + damping_value;
         }
- 
+
         diff = 0.0;
         for(int i = 0; i < GRAPH_ORDER; i++)
         {
@@ -109,12 +109,12 @@ void calculate_pagerank(double pagerank[])
         max_diff = (max_diff < diff) ? diff : max_diff;
         total_diff += diff;
         min_diff = (min_diff > diff) ? diff : min_diff;
- 
+
         for(int i = 0; i < GRAPH_ORDER; i++)
         {
             pagerank[i] = new_pagerank[i];
         }
-            
+
         double pagerank_total = 0.0;
         for(int i = 0; i < GRAPH_ORDER; i++)
         {
@@ -124,13 +124,13 @@ void calculate_pagerank(double pagerank[])
         {
             printf("[ERROR] Iteration %zu: sum of all pageranks is not 1 but %.12f.\n", iteration, pagerank_total);
         }
- 
+
 		double iteration_end = omp_get_wtime();
 		elapsed = omp_get_wtime() - start;
 		iteration++;
 		time_per_iteration = elapsed / iteration;
     }
-    
+
     printf("%zu iterations achieved in %.2f seconds\n", iteration, elapsed);
 }
 
@@ -191,13 +191,13 @@ int main(int argc, char* argv[])
 
     // Get the time at the very start.
     double start = omp_get_wtime();
-    
+
     generate_sneaky_graph();
- 
+
     /// The array in which each vertex pagerank is stored.
     double pagerank[GRAPH_ORDER];
     calculate_pagerank(pagerank);
- 
+
     // Calculates the sum of all pageranks. It should be 1.0, so it can be used as a quick verification.
     double sum_ranks = 0.0;
     for(int i = 0; i < GRAPH_ORDER; i++)
@@ -210,8 +210,8 @@ int main(int argc, char* argv[])
     }
     printf("Sum of all pageranks = %.12f, total diff = %.12f, max diff = %.12f and min diff = %.12f.\n", sum_ranks, total_diff, max_diff, min_diff);
     double end = omp_get_wtime();
- 
+
     printf("Total time taken: %.2f seconds.\n", end - start);
- 
+
     return 0;
 }
