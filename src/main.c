@@ -107,6 +107,16 @@ void get_l2_array(int8_t adjacency_matrix[GRAPH_ORDER][GRAPH_ORDER], const int l
  */
 void calculate_pagerank(double pagerank[])
 {
+
+    // Compute the L1 and L2 representation of the adjacency matrix
+    int L1[GRAPH_ORDER];
+    int l2_size = 0;
+    get_l1_array(adjacency_matrix, L1, &l2_size);
+
+    const int l2_size_const = l2_size;
+    int L2[l2_size_const];
+    get_l2_array(adjacency_matrix, l2_size_const, L2);
+
     double initial_rank = 1.0 / GRAPH_ORDER;
 
     // Initialise all vertices to 1/n.
@@ -127,7 +137,6 @@ void calculate_pagerank(double pagerank[])
     }
 
     // If we exceeded the MAX_TIME seconds, we stop. If we typically spend X seconds on an iteration, and we are less than X seconds away from MAX_TIME, we stop.
-
     call_init_double_loop();
 
     while(elapsed < MAX_TIME && (elapsed + time_per_iteration) < MAX_TIME)
@@ -232,18 +241,6 @@ int main(int argc, char* argv[])
     double start = omp_get_wtime();
 
     generate_sneaky_graph();
-
-    // Compute the L1 and L2 representation of the adjacency matrix
-    int L1[GRAPH_ORDER];
-    int l2_size = 0;
-    get_l1_array(adjacency_matrix, L1, &l2_size);
-
-    const int l2_size_const = l2_size;
-    int L2[l2_size_const];
-    get_l2_array(adjacency_matrix, l2_size_const, L2);
-
-
-
 
     /// The array in which each vertex pagerank is stored.
     double pagerank[GRAPH_ORDER];
