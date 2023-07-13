@@ -13,7 +13,7 @@
 
 
 /// The number of vertices in the graph.
-#define GRAPH_ORDER 1000
+#define GRAPH_ORDER 10
 /// Parameters used in pagerank convergence, do not change.
 #define DAMPING_FACTOR 0.85
 /// The number of seconds to not exceed forthe calculation loop.
@@ -58,6 +58,48 @@ void call_init_double_loop()
     }
 }
 
+/*
+    Populate the L1 array with the number of non zero elements in each row of the adjacency matrix
+*/
+void get_l1_array(int8_t adjacency_matrix[GRAPH_ORDER][GRAPH_ORDER], int L1[GRAPH_ORDER], int *l2_size)
+{
+    *l2_size = 0;
+    for (int i=0; i<GRAPH_ORDER; i++)
+    {
+        int entries_per_row = 0;
+        for (int j=0; j<GRAPH_ORDER; j++)
+        {
+            if (adjacency_matrix[j][i] != 0)
+            {
+                entries_per_row++;
+            }
+        }
+        L1[i] = entries_per_row;
+        *l2_size += entries_per_row;
+    }
+    return;
+}
+
+/*
+    Populat the L2 array with the j indices of each non zero element of every row in the adjacency matrix
+*/
+void get_l2_array(int8_t adjacency_matrix[GRAPH_ORDER][GRAPH_ORDER], const int l2_size, int L2[l2_size])
+{
+    int l2_index = 0;
+    for (int i=0; i<GRAPH_ORDER; i++)
+    {
+        for (int j=0; j<GRAPH_ORDER; j++)
+        {
+            if (adjacency_matrix[j][i] != 0)
+            {
+                L2[l2_index] = j;
+                l2_index ++;
+            }
+        }
+    }
+    return;
+}
+
 
 /**
  * @brief Calculates the pagerank of all vertices in the graph.
@@ -65,6 +107,16 @@ void call_init_double_loop()
  */
 void calculate_pagerank(double pagerank[])
 {
+
+    // Compute the L1 and L2 representation of the adjacency matrix
+    int L1[GRAPH_ORDER];
+    int l2_size = 0;
+    get_l1_array(adjacency_matrix, L1, &l2_size);
+
+    const int l2_size_const = l2_size;
+    int L2[l2_size_const];
+    get_l2_array(adjacency_matrix, l2_size_const, L2);
+
     double initial_rank = 1.0 / GRAPH_ORDER;
 
     // Initialise all vertices to 1/n.
@@ -85,7 +137,6 @@ void calculate_pagerank(double pagerank[])
     }
 
     // If we exceeded the MAX_TIME seconds, we stop. If we typically spend X seconds on an iteration, and we are less than X seconds away from MAX_TIME, we stop.
-
     call_init_double_loop();
 
     while(elapsed < MAX_TIME && (elapsed + time_per_iteration) < MAX_TIME)
