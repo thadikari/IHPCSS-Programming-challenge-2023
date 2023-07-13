@@ -13,7 +13,7 @@
 
 
 /// The number of vertices in the graph.
-#define GRAPH_ORDER 10
+#define GRAPH_ORDER 1000
 /// Parameters used in pagerank convergence, do not change.
 #define DAMPING_FACTOR 0.85
 /// The number of seconds to not exceed forthe calculation loop.
@@ -61,7 +61,7 @@ void call_init_double_loop()
 /*
     Populate the L1 array with the number of non zero elements in each row of the adjacency matrix
 */
-void get_l1_array(int8_t adjacency_matrix[GRAPH_ORDER][GRAPH_ORDER], int L1[GRAPH_ORDER], int *l2_size)
+void get_l1_array(int L1[GRAPH_ORDER], int *l2_size)
 {
     *l2_size = 0;
     for (int i=0; i<GRAPH_ORDER; i++)
@@ -83,17 +83,18 @@ void get_l1_array(int8_t adjacency_matrix[GRAPH_ORDER][GRAPH_ORDER], int L1[GRAP
 /*
     Populat the L2 array with the j indices of each non zero element of every row in the adjacency matrix
 */
-void get_l2_array(int8_t adjacency_matrix[GRAPH_ORDER][GRAPH_ORDER], const int l2_size, int L2[l2_size])
+void get_l2_array(const int l2_size, int L2[l2_size], int L3[GRAPH_ORDER])
 {
-    int l2_index = 0;
+    int offset = 0;
     for (int i=0; i<GRAPH_ORDER; i++)
     {
+        L3[i] = offset;
         for (int j=0; j<GRAPH_ORDER; j++)
         {
             if (adjacency_matrix[j][i] != 0)
             {
-                L2[l2_index] = j;
-                l2_index ++;
+                L2[offset] = j;
+                offset++;
             }
         }
     }
@@ -110,12 +111,13 @@ void calculate_pagerank(double pagerank[])
 
     // Compute the L1 and L2 representation of the adjacency matrix
     int L1[GRAPH_ORDER];
+    int L3[GRAPH_ORDER];
     int l2_size = 0;
-    get_l1_array(adjacency_matrix, L1, &l2_size);
+    get_l1_array(L1, &l2_size);
 
     const int l2_size_const = l2_size;
     int L2[l2_size_const];
-    get_l2_array(adjacency_matrix, l2_size_const, L2);
+    get_l2_array(l2_size_const, L2, L3);
 
     double initial_rank = 1.0 / GRAPH_ORDER;
 
@@ -148,9 +150,12 @@ void calculate_pagerank(double pagerank[])
         #pragma omp parallel for
         for(int i = 0; i < GRAPH_ORDER; i++)
         {
+            int offset = L3[i];
+            const int nonzero_per_row = L1[i];
             double total = 0.;
-            for(int j = 0; j < GRAPH_ORDER; j++)
+            for(int l = 0; l < nonzero_per_row; l++)
             {
+                int j = L2[offset+l];
                 total += adjacency_matrix[j][i] * pagerank[j] * inverse_outdegree[j];
             }
             new_pagerank[i] = DAMPING_FACTOR * total + damping_value;
