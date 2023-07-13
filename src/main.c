@@ -94,6 +94,7 @@ void calculate_pagerank(double pagerank[])
         double diff = 0.0;
         double pagerank_total = 0.0;
 
+        #pragma omp parallel for
         for(int i = 0; i < GRAPH_ORDER; i++)
         {
             double total = 0.;
@@ -104,6 +105,7 @@ void calculate_pagerank(double pagerank[])
             new_pagerank[i] = DAMPING_FACTOR * total + damping_value;
         }
 
+        #pragma omp parallel for reduction(+:diff) reduction(+:pagerank_total)
         for(int i = 0; i < GRAPH_ORDER; i++)
         {
             diff += fabs(new_pagerank[i] - pagerank[i]);
