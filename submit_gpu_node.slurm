@@ -21,7 +21,7 @@
 # will be your first one. Remember to update it the days that follow :)
 # If you do *not* use a reservation, simply insert a space between '#' and
 # 'SBATCH', it will turn the line into a plain comment.
-#SBATCH --res ihpcssday3GPU2
+# SBATCH --res ihpcssday3GPU2
 
 # The partition to use, GPU nodes here
 #SBATCH -p GPU
