@@ -133,13 +133,26 @@ void calculate_pagerank(double pagerank[])
     double time_per_iteration = 0;
     double new_pagerank[GRAPH_ORDER];
 
+    // If we exceeded the MAX_TIME seconds, we stop. If we typically spend X seconds on an iteration, and we are less than X seconds away from MAX_TIME, we stop.
+    call_init_double_loop();
+
+    int num_devices = omp_get_num_devices();
+    printf("num_devices %d.\n", num_devices);
+
+    double new_pagerank_2d[num_devices][GRAPH_ORDER];
+
     for(int i = 0; i < GRAPH_ORDER; i++)
     {
         new_pagerank[i] = 0.0;
+        int d = i%num_devices;
+        new_pagerank_2d[d][i] = 0.0;
     }
 
-    // If we exceeded the MAX_TIME seconds, we stop. If we typically spend X seconds on an iteration, and we are less than X seconds away from MAX_TIME, we stop.
-    call_init_double_loop();
+    for (int d = 0; d < num_devices; d++)
+    {
+        #pragma omp target enter data device(d) map(alloc:L1[0:GRAPH_ORDER],L3[0:GRAPH_ORDER],L2[0:l2_size],adjacency_matrix[0:GRAPH_ORDER][0:GRAPH_ORDER],inverse_outdegree[0:GRAPH_ORDER],DAMPING_FACTOR,damping_value,pagerank[0:GRAPH_ORDER],new_pagerank_2d[d:1][0:GRAPH_ORDER])
+        #pragma omp target update device(d) to(L1[0:GRAPH_ORDER],L3[0:GRAPH_ORDER],L2[0:l2_size],adjacency_matrix[0:GRAPH_ORDER][0:GRAPH_ORDER],inverse_outdegree[0:GRAPH_ORDER],DAMPING_FACTOR,damping_value,pagerank[0:GRAPH_ORDER],new_pagerank_2d[d:1][0:GRAPH_ORDER])
+    }
 
     while(elapsed < MAX_TIME && (elapsed + time_per_iteration) < MAX_TIME)
     {
@@ -148,22 +161,34 @@ void calculate_pagerank(double pagerank[])
         double pagerank_total = 0.0;
 
         #pragma omp parallel for
-        for(int i = 0; i < GRAPH_ORDER; i++)
+        for (int d = 0; d < num_devices; d++)
         {
-            int offset = L3[i];
-            const int nonzero_per_row = L1[i];
-            double total = 0.;
-            for(int l = 0; l < nonzero_per_row; l++)
+            #pragma omp target update device(d) to(pagerank[0:GRAPH_ORDER])
+
+            #pragma omp target teams distribute device(d)
+            for(int i = d; i < GRAPH_ORDER; i += num_devices)
             {
-                int j = L2[offset+l];
-                total += adjacency_matrix[j][i] * pagerank[j] * inverse_outdegree[j];
+                int offset = L3[i];
+                const int nonzero_per_row = L1[i];
+                double total = 0.;
+                #pragma omp parallel for default(none) shared(i,L2,offset,adjacency_matrix,pagerank,inverse_outdegree) reduction(+:total)
+                for(int l = 0; l < nonzero_per_row; l++)
+                {
+                    int j = L2[offset+l];
+                    total += adjacency_matrix[j][i] * pagerank[j] * inverse_outdegree[j];
+                }
+                new_pagerank_2d[d][i] = DAMPING_FACTOR * total + damping_value;
             }
-            new_pagerank[i] = DAMPING_FACTOR * total + damping_value;
+
+            #pragma omp target update device(d) from(new_pagerank_2d[d:1][0:GRAPH_ORDER])
         }
 
         #pragma omp parallel for reduction(+:diff) reduction(+:pagerank_total)
         for(int i = 0; i < GRAPH_ORDER; i++)
         {
+            int d = i%num_devices;
+            new_pagerank[i] = new_pagerank_2d[d][i];
+
             diff += fabs(new_pagerank[i] - pagerank[i]);
             pagerank[i] = new_pagerank[i];
             pagerank_total += pagerank[i];
@@ -182,6 +207,11 @@ void calculate_pagerank(double pagerank[])
 		elapsed = omp_get_wtime() - start;
 		iteration++;
 		time_per_iteration = elapsed / iteration;
+    }
+
+    for (int d = 0; d < num_devices; d++)
+    {
+        // #pragma omp target exit data device(d) map(delete:L1,L3,L2[0:l2_size],pagerank,new_pagerank,adjacency_matrix,inverse_outdegree,DAMPING_FACTOR,damping_value)
     }
 
     printf("%zu iterations achieved in %.2f seconds\n", iteration, elapsed);
