@@ -13,7 +13,7 @@
 
 
 /// The number of vertices in the graph.
-#define GRAPH_ORDER 1000
+#define GRAPH_ORDER 10
 /// Parameters used in pagerank convergence, do not change.
 #define DAMPING_FACTOR 0.85
 /// The number of seconds to not exceed forthe calculation loop.
@@ -61,7 +61,7 @@ void call_init_double_loop()
 /*
     Populate the L1 array with the number of non zero elements in each row of the adjacency matrix
 */
-void get_l1_array(const int8_t adjacency_matrix[GRAPH_ORDER][GRAPH_ORDER], int L1[GRAPH_ORDER], int *l2_size)
+void get_l1_array(int8_t adjacency_matrix[GRAPH_ORDER][GRAPH_ORDER], int L1[GRAPH_ORDER], int *l2_size)
 {
     *l2_size = 0;
     for (int i=0; i<GRAPH_ORDER; i++)
@@ -83,7 +83,7 @@ void get_l1_array(const int8_t adjacency_matrix[GRAPH_ORDER][GRAPH_ORDER], int L
 /*
     Populat the L2 array with the j indices of each non zero element of every row in the adjacency matrix
 */
-void get_l2_array(const int8_t adjacency_matrix[GRAPH_ORDER][GRAPH_ORDER], const int l2_size, int L2[l2_size])
+void get_l2_array(int8_t adjacency_matrix[GRAPH_ORDER][GRAPH_ORDER], const int l2_size, int L2[l2_size])
 {
     int l2_index = 0;
     for (int i=0; i<GRAPH_ORDER; i++)
@@ -232,6 +232,18 @@ int main(int argc, char* argv[])
     double start = omp_get_wtime();
 
     generate_sneaky_graph();
+
+    // Compute the L1 and L2 representation of the adjacency matrix
+    int L1[GRAPH_ORDER];
+    int l2_size = 0;
+    get_l1_array(adjacency_matrix, L1, &l2_size);
+
+    const int l2_size_const = l2_size;
+    int L2[l2_size_const];
+    get_l2_array(adjacency_matrix, l2_size_const, L2);
+
+
+
 
     /// The array in which each vertex pagerank is stored.
     double pagerank[GRAPH_ORDER];
