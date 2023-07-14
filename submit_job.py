@@ -38,7 +38,7 @@ def run(OMP_NUM_THREADS, MPI_PROCESS_COUNT, NUM_GPU, NUM_NODES):
         cc = cc.replace('export MPI_PROCESS_COUNT=1;', f'export MPI_PROCESS_COUNT={MPI_PROCESS_COUNT};')
 
     if NUM_GPU:
-        cc = cc.replace('#SBATCH --gres=gpu:v100-16:1', f'#SBATCH --gres=gpu:v100-16:{NUM_GPU}')
+        cc = cc.replace('#SBATCH --gres=gpu:8', f'#SBATCH --gres=gpu:{NUM_GPU}')
 
     if NUM_NODES:
         new = f'#SBATCH -N {NUM_NODES}'
