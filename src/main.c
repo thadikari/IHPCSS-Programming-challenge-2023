@@ -141,7 +141,8 @@ void calculate_pagerank(double pagerank[])
     // If we exceeded the MAX_TIME seconds, we stop. If we typically spend X seconds on an iteration, and we are less than X seconds away from MAX_TIME, we stop.
     call_init_double_loop();
 
-    #pragma omp target enter data map(alloc:L1,L3,L2[0:l2_size],adjacency_matrix,inverse_outdegree,DAMPING_FACTOR,damping_value) map(alloc:pagerank,new_pagerank)
+    #pragma omp target enter data map(alloc:L1[0:GRAPH_ORDER],L3[0:GRAPH_ORDER],L2[0:l2_size],adjacency_matrix[0:GRAPH_ORDER][0:GRAPH_ORDER],inverse_outdegree[0:GRAPH_ORDER],DAMPING_FACTOR,damping_value,pagerank[0:GRAPH_ORDER],new_pagerank[0:GRAPH_ORDER])
+    #pragma omp target update to(L1[0:GRAPH_ORDER],L3[0:GRAPH_ORDER],L2[0:l2_size],adjacency_matrix[0:GRAPH_ORDER][0:GRAPH_ORDER],inverse_outdegree[0:GRAPH_ORDER],DAMPING_FACTOR,damping_value,pagerank[0:GRAPH_ORDER],new_pagerank[0:GRAPH_ORDER])
 
     while(elapsed < MAX_TIME && (elapsed + time_per_iteration) < MAX_TIME)
     {
@@ -149,7 +150,7 @@ void calculate_pagerank(double pagerank[])
         double diff = 0.0;
         double pagerank_total = 0.0;
 
-        #pragma omp target update to(pagerank)
+        #pragma omp target update to(pagerank[0:GRAPH_ORDER])
 
         #pragma omp target teams distribute
         for(int i = 0; i < GRAPH_ORDER; i++)
@@ -157,7 +158,7 @@ void calculate_pagerank(double pagerank[])
             int offset = L3[i];
             const int nonzero_per_row = L1[i];
             double total = 0.;
-            #pragma omp parallel for default(none) shared(L2,offset,pagerank,inverse_outdegree,adjacency_matrix) firstprivate(i) reduction(+:total)
+            #pragma omp parallel for default(none) shared(i,L2,offset,adjacency_matrix,pagerank,inverse_outdegree) reduction(+:total)
             for(int l = 0; l < nonzero_per_row; l++)
             {
                 int j = L2[offset+l];
@@ -166,7 +167,9 @@ void calculate_pagerank(double pagerank[])
             new_pagerank[i] = DAMPING_FACTOR * total + damping_value;
         }
 
-        #pragma omp target teams distribute reduction(+:diff) reduction(+:pagerank_total)
+        #pragma omp target update from(new_pagerank[0:GRAPH_ORDER])
+
+        #pragma omp parallel for reduction(+:diff) reduction(+:pagerank_total)
         for(int i = 0; i < GRAPH_ORDER; i++)
         {
             diff += fabs(new_pagerank[i] - pagerank[i]);
