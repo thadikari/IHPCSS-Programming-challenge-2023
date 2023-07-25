@@ -80,6 +80,7 @@ void get_l1_array(int L1[GRAPH_ORDER], int *l2_size)
     return;
 }
 
+
 /*
     Populat the L2 array with the j indices of each non zero element of every row in the adjacency matrix
 */
@@ -141,18 +142,20 @@ void calculate_pagerank(double pagerank[])
     // If we exceeded the MAX_TIME seconds, we stop. If we typically spend X seconds on an iteration, and we are less than X seconds away from MAX_TIME, we stop.
     call_init_double_loop();
 
+    const int chunk_size = 16;
     while(elapsed < MAX_TIME && (elapsed + time_per_iteration) < MAX_TIME)
     {
         double iteration_start = omp_get_wtime();
         double diff = 0.0;
         double pagerank_total = 0.0;
 
-        #pragma omp parallel for
+        #pragma omp parallel for schedule(dynamic, chunk_size)
         for(int i = 0; i < GRAPH_ORDER; i++)
         {
             int offset = L3[i];
             const int nonzero_per_row = L1[i];
             double total = 0.;
+            #pragma omp simd reduction(+:total)
             for(int l = 0; l < nonzero_per_row; l++)
             {
                 int j = L2[offset+l];
